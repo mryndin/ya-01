@@ -1,0 +1,67 @@
+@startuml
+!theme plain
+hide circle
+
+title ER Diagram - SmartHome MVP Logical Model
+
+' Сущности Identity Service
+entity "User" as user {
+  * id : UUID <<PK>>
+  --
+  email : VARCHAR
+  password_hash : VARCHAR
+  role : VARCHAR
+}
+
+' Сущности для управления дислокацией
+entity "House" as house {
+  * id : UUID <<PK>>
+  --
+  user_id : UUID <<FK>>
+  name : VARCHAR
+  address : TEXT
+}
+
+' Сущности для управления оборудованием (Legacy + New)
+entity "Module" as module {
+  * id : UUID <<PK>>
+  --
+  house_id : UUID <<FK>>
+  serial_number : VARCHAR <<UNIQUE>>
+  status : VARCHAR
+}
+
+entity "Device" as device {
+  * id : INTEGER <<PK>> -- Совместимость с Legacy SERIAL
+  --
+  module_id : UUID <<FK>>
+  type_id : INTEGER <<FK>>
+  name : VARCHAR
+  last_value : DOUBLE -- Для синхронизации с монолитом
+}
+
+entity "DeviceType" as d_type {
+  * id : INTEGER <<PK>>
+  --
+  name : VARCHAR
+  unit : VARCHAR -- (°C, %, On/Off)
+}
+
+' Высоконагруженная сущность
+entity "TelemetryData" as telemetry {
+  * id : BIGINT <<PK>>
+  --
+  device_id : INTEGER <<FK>>
+  value : DOUBLE
+  timestamp : TIMESTAMP
+}
+
+' Связи и индексы
+user ||--o{ house
+house ||--o{ module
+module ||--o{ device
+d_type ||--o{ device
+device ||--o{ telemetry
+
+note right of telemetry : Индексы: \nidx_device_time (device_id, timestamp)
+@enduml
