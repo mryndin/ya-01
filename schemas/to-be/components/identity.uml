@@ -1,0 +1,19 @@
+@startuml
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Component.puml
+
+title Component Diagram - Identity Service (Java)
+
+Container_Boundary(auth_svc, "Identity Service") {
+    Component(auth_ctrl, "Auth Controller", "Spring RestController", "Обработка запросов на вход/регистрацию")
+    Component(jwt_provider, "JWT Token Provider", "Spring Security", "Генерация и валидация токенов")
+    Component(user_svc, "User Management Service", "Spring Service", "Бизнес-логика пользователей и прав доступа")
+    Component(user_repo, "User Repository", "Spring Data JPA", "Доступ к данным пользователей")
+}
+
+ContainerDb(auth_db, "Security DB", "PostgreSQL", "Хранит учетные данные и связи User-House")
+Rel(auth_ctrl, user_svc, "Вызывает")
+Rel(user_svc, jwt_provider, "Запрашивает генерацию токена")
+Rel(user_svc, user_repo, "Работа с сущностями")
+Rel(user_repo, auth_db, "SQL/JDBC")
+
+@enduml

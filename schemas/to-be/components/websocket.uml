@@ -1,0 +1,20 @@
+@startuml
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Component.puml
+
+title Component Diagram - WebSocket Service (Node.js)
+
+Container_Boundary(ws_svc, "WebSocket Service") {
+    Component(ws_server, "Socket.io Server", "Node.js", "Управление WSS соединениями")
+    Component(auth_middleware, "Auth Middleware", "Passport.js", "Проверка JWT и прав доступа")
+    Component(event_sub, "Event Subscriber", "Redis", "Подписка на события от Telemetry Service")
+    Component(room_mgr, "Room Manager", "Logic", "Группировка сокетов по HouseID")
+}
+
+Container(auth_svc, "Identity Service", "Java", "Проверка полномочий")
+
+Rel(ws_server, auth_middleware, "Проверка токена при connect")
+Rel(auth_middleware, auth_svc, "gRPC/HTTP запрос прав")
+Rel(event_sub, room_mgr, "Новые данные")
+Rel(room_mgr, ws_server, "Push в конкретную комнату")
+
+@enduml

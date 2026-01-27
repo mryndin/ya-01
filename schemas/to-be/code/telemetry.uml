@@ -1,0 +1,41 @@
+@startuml
+title Code Diagram: Telemetry Service Logic (Python)
+
+package "telemetry_app" {
+    class MQTTListener {
+        - client: PahoMqtt
+        + on_message(topic, payload) : void
+        + subscribe(topic) : void
+    }
+
+    class DataProcessor {
+        + validate(raw_json) : TelemetryModel
+        + transform(model) : dict
+    }
+
+    class HistoryRepository {
+        - db: TimescaleDB
+        + async_save(data) : void
+    }
+
+    class LegacyAdapter {
+        - base_url: string
+        + async_patch_value(id, val) : Response
+    }
+
+    class EventBus {
+        + broadcast(house_id, data) : void
+    }
+}
+
+MQTTListener --> DataProcessor : "1. Извлечение данных"
+DataProcessor --> HistoryRepository : "2. Запись в архив"
+DataProcessor --> LegacyAdapter : "3. Синхронизация с Монолитом"
+DataProcessor --> EventBus : "4. Передача в канал связи"
+
+note bottom of LegacyAdapter
+  Выполняет PATCH /api/v1/sensors/:id/value.
+  Использует retry-политику, чтобы 
+  временные сбои монолита не теряли данные.
+end note
+@enduml

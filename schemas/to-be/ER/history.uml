@@ -1,0 +1,21 @@
+@startuml
+!theme plain
+hide circle
+
+title ER Diagram: History DB (TimescaleDB)
+
+entity "temperature_logs" {
+    * sensor_id : INT <<PK>>
+    * recorded_at : TIMESTAMP <<PK>> -- Составной PK для Time-series
+    --
+    * value : DOUBLE PRECISION
+    status : VARCHAR(20)
+}
+
+note right of temperature_logs
+  Индекс (Timescale hypertable): 
+  - (recorded_at DESC, sensor_id)
+  - Сжатие данных по истечении 7 дней
+end note
+
+@enduml

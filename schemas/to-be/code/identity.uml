@@ -1,0 +1,36 @@
+@startuml
+title Code Diagram: Identity Service Internal Logic
+
+package "com.smarthome.identity" {
+    class UserEntity {
+        +UUID id
+        +String email
+        +String passwordHash
+        +Set<Role> roles
+    }
+    
+    class AccessManager {
+        +checkAccess(userId, houseId): boolean
+        +grantAccess(userId, houseId, level)
+    }
+    
+    interface UserRepository {
+        +findByEmail(email): User
+        +save(User)
+    }
+    
+    class JwtUtil {
+        +generateToken(User): String
+        +extractClaims(String): Claims
+    }
+}
+
+AccessManager --> UserRepository : "Проверка связей в DB"
+JwtUtil ..> UserEntity : "Использует данные для Payload"
+
+note bottom of AccessManager
+  Этот компонент вызывается WebSocket-сервисом
+  через gRPC/REST для валидации прав 
+  подключения к конкретному дому.
+end note
+@enduml

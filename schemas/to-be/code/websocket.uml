@@ -1,0 +1,37 @@
+@startuml
+title Code Diagram: WebSocket Service Logic (Node.js)
+
+package "ws_server" {
+    class SocketManager {
+        - io: Server
+        + handleConnection(socket) : void
+        + sendToRoom(roomId, event, data) : void
+    }
+
+    class AuthGuard {
+        + verifyToken(jwt) : UserProfile
+        + getAllowedHouses(userId) : List<UUID>
+    }
+
+    class ChannelSubscriber {
+        - channel: Stream
+        + onDataReceived(msg) : void
+    }
+
+    class RoomCoordinator {
+        + joinHouseRooms(socket, houseIds) : void
+    }
+}
+
+SocketManager --> AuthGuard : "1. Аутентификация при коннекте"
+AuthGuard --> RoomCoordinator : "2. Список разрешенных комнат"
+ChannelSubscriber --> SocketManager : "3. Получение данных из канала"
+SocketManager --> "Web/Mobile Client" : "4. Push-уведомление"
+
+note right of RoomCoordinator
+  Использует встроенный механизм 
+  Socket.io Rooms. Пользователь 
+  получает данные только тех домов, 
+  к которым привязан в Identity Service.
+end note
+@enduml

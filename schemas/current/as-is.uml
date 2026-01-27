@@ -1,0 +1,27 @@
+@startuml
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Context.puml
+
+title C4 Context Diagram - SmartHome Monolith (As-Is)
+
+' Акторы
+Person(user, "Пользователь", "Клиент системы (Web/Mobile). \nВ текущей версии - анонимный (No Auth).")
+
+' Основная система
+System(smarthome, "SmartHome System", "Монолит на Go + PostgreSQL.\nОбеспечует CRUD устройств и проксирование запросов температуры.")
+
+' Внешние системы
+System_Ext(temp_sensor_api, "Temperature Sensors API", "Внешняя система / Эмулятор датчиков.\nОтдает данные о температуре по запросу.")
+
+' Взаимодействия
+Rel(user, smarthome, "1. Управляет устройствами, смотрит температуру", "HTTP/JSON")
+Rel(smarthome, temp_sensor_api, "2. Синхронно запрашивает данные (GET /temperature)", "HTTP/REST")
+
+note right of smarthome
+  <b>Проблемы архитектуры:</b>
+  1. Синхронная блокировка: если Sensors API недоступен, 
+     клиент получает ошибку или тайм-аут.
+  2. БД (Postgres) скрыта внутри монолита.
+  3. Отсутствует слой авторизации.
+end note
+
+@enduml

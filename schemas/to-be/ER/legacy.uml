@@ -1,0 +1,28 @@
+@startuml
+!theme plain
+hide circle
+
+title ER Diagram: Legacy DB (PostgreSQL)
+
+entity "sensors" {
+    * id : SERIAL <<PK>>
+    --
+    name : VARCHAR(100)
+    type : VARCHAR(50)
+    location : VARCHAR(100)
+    value : FLOAT -- Обновляется через PATCH от Telemetry
+    unit : VARCHAR(20)
+    status : VARCHAR(20)
+    last_updated : TIMESTAMP
+    created_at : TIMESTAMP
+}
+
+note bottom of sensors
+  Существующие индексы:
+  - idx_sensors_type
+  - idx_sensors_location
+  - idx_sensors_status
+end note
+
+@enduml
+
