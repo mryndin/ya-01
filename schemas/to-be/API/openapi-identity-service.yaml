@@ -1,0 +1,156 @@
+openapi: 3.0.3
+info:
+  title: SmartHome Identity Service
+  description: "API для управления пользователями, домами и устройствами с разделением ролей Admin и User."
+  version: 1.1.0
+
+servers:
+  - url: https://api.smarthome.io/v1
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    House:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: "Уникальный ID дома (UUID PK)"
+        name:
+          type: string
+          example: "Загородный дом"
+        city:
+          type: string
+          example: "Москва"
+        address:
+          type: string
+          example: "ул. Лесная, д. 5"
+
+    UserHouseLink:
+      type: object
+      required:
+        - house_id
+      properties:
+        house_id:
+          type: string
+          format: uuid
+        access_level:
+          type: string
+          enum: [owner, viewer, editor]
+          default: owner
+
+    DeviceClaim:
+      type: object
+      required:
+        - device_id
+        - house_id
+      properties:
+        device_id:
+          type: integer
+          description: "ID из Legacy DB (sensors.id)"
+        house_id:
+          type: string
+          format: uuid
+        auth_key:
+          type: string
+          description: "Ключ авторизации для MQTT"
+
+security:
+  - BearerAuth: []
+
+paths:
+  /auth/login:
+    post:
+      summary: "Вход в систему"
+      security: []
+      tags:
+        - Auth
+      responses:
+        '200':
+          description: "Успешный вход"
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  token:
+                    type: string
+
+  /admin/houses:
+    post:
+      summary: "[Admin] Создание нового дома"
+      description: "Создает запись в таблице houses (Security DB)."
+      tags:
+        - Admin
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/House'
+      responses:
+        '201':
+          description: "Дом создан"
+
+  /admin/users/{user_id}/houses:
+    post:
+      summary: "[Admin] Привязка дома к пользователю"
+      description: "Создает запись в таблице user_houses."
+      tags:
+        - Admin
+      parameters:
+        - name: user_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserHouseLink'
+      responses:
+        '200':
+          description: "Доступ предоставлен"
+
+  /houses:
+    get:
+      summary: "Список домов пользователя"
+      description: "Возвращает дома, привязанные к пользователю через user_houses."
+      tags:
+        - User
+      responses:
+        '200':
+          description: "Список дислокаций"
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/House'
+
+  /devices/claim:
+    post:
+      summary: "Регистрация устройства"
+      description: "Привязка device_id (INT) к дому (UUID) в таблице device_ownership."
+      tags:
+        - User
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DeviceClaim'
+      responses:
+        '201':
+          description: "Устройство привязано"
+        '403':
+          description: "Нет прав на указанный дом"
