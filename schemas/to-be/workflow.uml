@@ -3,49 +3,49 @@ autonumber
 actor Admin
 actor User
 participant "Identity Service" as Identity
-participant "Legacy Monolith" as Monolith
 database "Postgres (Security DB)" as DB
+participant "Legacy Monolith" as Monolith
 participant "MQTT Broker" as MQTT
 participant "Telemetry Service" as Telemetry
 participant "WebSocket Service" as WS
 
-== 1. Настройка инфраструктуры Админом ==
-Admin -> Identity : POST /api/v1/houses\n(name, city, address)
+== 1. Вход и настройка системы (Admin) ==
+Admin -> Identity : POST /auth/login (admin credentials)
+Identity -> DB : Verify credentials
+Identity --> Admin : Auth Token (Admin Role)
+
+Admin -> Identity : POST /api/v1/houses (Register House)
 Identity -> DB : INSERT INTO houses
-Identity --> Admin : House Created (ID: house_uuid)
+Identity --> Admin : House Created (UUID)
 
-Admin -> Identity : POST /api/v1/users (register)
+Admin -> Identity : POST /api/v1/users (Register User)
 Identity -> DB : INSERT INTO users
-Identity --> Admin : User Created (ID: user_uuid)
+Identity --> Admin : User Created (UUID)
 
-Admin -> Identity : POST /api/v1/houses/{id}/assign-user\n{user_id: user_uuid}
+Admin -> Identity : POST /api/v1/houses/{id}/assign-user
+note right: Связывает пользователя с объектом
 Identity -> DB : INSERT INTO user_houses
-note right: Связываем пользователя с домом
-Identity --> Admin : Access Granted
+Identity --> Admin : Access Linked
 
-== 2. Настройка устройств Пользователем ==
+== 2. Работа Пользователя ==
 User -> Identity : POST /auth/login
-Identity --> User : Auth Token
+Identity --> User : Auth Token (User Role)
 
 User -> Identity : POST /api/v1/houses/{id}/devices
-note right: Указывает, какой модуль (device_id)\nстоит в этом доме
-Identity -> DB : INSERT INTO device_ownership\n(device_id, house_id, auth_key)
-Identity --> User : Device Linked to House
+note right: Указывает, какой датчик (ID из монолита)\nустановлен в этом доме
+Identity -> DB : INSERT INTO device_ownership
+Identity --> User : Device Module Linked
 
-== 3. Эксплуатация и мониторинг ==
+== 3. Поток телеметрии ==
 entity "IoT Sensor" as Sensor
-Sensor -> MQTT : pub: device/telemetry\n{device_id, value, auth_key}
+Sensor -> MQTT : pub: device/telemetry {id, value, auth_key}
+MQTT -> Telemetry : Dispatch
+Telemetry -> Identity : Validate(id, key)
+Identity --> Telemetry : Valid (Target: House A)
 
-MQTT -> Telemetry : Dispatch message
-Telemetry -> Identity : GET /validate/device/{id}
-Identity -> DB : SELECT house_id, auth_key\nFROM device_ownership
-Identity --> Telemetry : Valid (House: "Green St. 10")
-
-Telemetry -> Monolith : PATCH /sensors/{id}
-Monolith -> DB : UPDATE sensors
-Monolith --> Telemetry : OK
-
-Telemetry -> MQTT : pub: internal/notify
-MQTT -> WS : Forward update
-WS -> User : WebSocket: {data, house_info}
+Telemetry -> Monolith : PATCH /api/v1/sensors/{id}
+Monolith -> DB : Update sensors table
+Telemetry -> MQTT : internal/notify
+MQTT -> WS : Forward
+WS -> User : WebSocket: Real-time Update
 @enduml
