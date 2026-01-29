@@ -14,6 +14,7 @@ CREATE TABLE IF NOT EXISTS users (
 CREATE TABLE IF NOT EXISTS houses (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     name VARCHAR(100) NOT NULL,
+    city VARCHAR(100),
     address TEXT,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
