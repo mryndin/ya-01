@@ -1,31 +1,60 @@
 #!/bin/bash
-
-# Exit on any error
 set -e
 
-echo "Starting the Smart Home Sensor API..."
+echo "----------------------------------------------------"
+echo "Starting Smart Home Microservices Infrastructure..."
+echo "----------------------------------------------------"
+
+# 1. Подготовка инфраструктуры
+mkdir -p mosquitto/config mosquitto/data mosquitto/log
+
+if [ ! -f mosquitto/config/mosquitto.conf ]; then
+    echo "Creating mosquitto.conf..."
+    cat <<EOT > mosquitto/config/mosquitto.conf
+persistence true
+persistence_location /mosquitto/data/
+log_dest stdout
+listener 1883
+allow_anonymous true
+EOT
+fi
+
+# 2. Запуск контейнеров
 echo "Building and starting containers..."
 docker-compose up --build -d
 
-echo "Waiting for services to be ready..."
-# Wait for PostgreSQL to be ready
-for i in {1..30}; do
-  if docker exec smarthome-postgres pg_isready -U postgres > /dev/null 2>&1; then
-    echo "PostgreSQL is ready!"
-    break
-  fi
-  echo "Waiting for PostgreSQL to start... ($i/30)"
-  sleep 1
+# 3. Ожидание PostgreSQL
+echo "Waiting for PostgreSQL to be ready..." 
+MAX_RETRIES=30
+COUNT=0
+
+until docker exec smarthome-postgres pg_isready -U postgres -d smarthome > /dev/null 2>&1 || [ $COUNT -eq $MAX_RETRIES ]; do
+  echo "Waiting for DB... ($((COUNT+1))/$MAX_RETRIES)"
+  sleep 2
+  COUNT=$((COUNT+1))
 done
 
-# Check if PostgreSQL is ready
-if ! docker exec smarthome-postgres pg_isready -U postgres > /dev/null 2>&1; then
-  echo "Error: PostgreSQL did not start within the expected time."
+if [ $COUNT -eq $MAX_RETRIES ]; then
+  echo "Error: PostgreSQL timeout."
   exit 1
 fi
 
-echo "All services are up and running!"
-echo "The API is available at http://localhost:8080"
-echo ""
-echo "To view logs, run: docker-compose logs -f"
-echo "To stop the services, run: docker-compose down"
+echo "PostgreSQL is ready!" 
+
+# 4. Инициализация БД (Принудительное применение обоих файлов)
+echo "Applying Monolith DB schemas (init.sql)..."
+if [ -f smart_home/init.sql ]; then
+    docker exec -i smarthome-postgres psql -U postgres -d smarthome < smart_home/init.sql
+fi
+
+if [ -f init-security.sql ]; then
+    echo "Applying Security DB schemas (init-security.sql)..."
+    docker exec -i smarthome-postgres psql -U postgres -d smarthome < init-security.sql
+fi
+
+echo "===================================================="
+echo "Infrastructure is UP and schemas applied!"
+echo "Legacy Monolith: http://localhost:8080"
+echo "Identity API:    http://localhost:8082"
+echo "WS Stream:       ws://localhost:8084"
+echo "===================================================="

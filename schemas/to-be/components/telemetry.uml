@@ -1,0 +1,25 @@
+@startuml
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Component.puml
+
+title Component Diagram - Telemetry Service (Python)
+
+Container_Boundary(telemetry_svc, "Telemetry Service") {
+    Component(mqtt_client, "MQTT Subscriber", "paho-mqtt", "Прослушивание топиков устройств")
+    Component(stream_proc, "Stream Processor", "Python Class", "Валидация и фильтрация входящих данных")
+    Component(hist_writer, "History Writer", "SQLAlchemy", "Запись показаний в архив")
+    Component(sync_client, "Legacy Sync Client", "httpx", "PATCH запросы в Monolith API")
+    Component(event_pub, "Internal Event Publisher", "Redis/Internal", "Передача данных в WS Service")
+}
+
+ContainerDb(history_db, "History DB", "TimescaleDB", "Архив телеметрии")
+Container(monolith, "Legacy Monolith", "Go", "Обновление текущего состояния")
+
+Rel(mqtt_client, stream_proc, "Raw data")
+Rel(stream_proc, hist_writer, "Valid data")
+Rel(stream_proc, sync_client, "Latest value")
+Rel(stream_proc, event_pub, "UI Update")
+
+Rel(hist_writer, history_db, "Insert")
+Rel(sync_client, monolith, "HTTP PATCH")
+
+@enduml

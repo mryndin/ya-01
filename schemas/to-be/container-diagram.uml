@@ -1,0 +1,60 @@
+@startuml
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Container.puml
+
+LAYOUT_WITH_LEGEND()
+
+title Container Diagram - SmartHome MVP (Multi-Language)
+
+Person(user, "Пользователь", "Управляет домом, просматривает телеметрию")
+
+System_Boundary(c1, "SmartHome Ecosystem") {
+    
+    ' Слой безопасности на Java (Spring Security/Keycloak context)
+    Container(auth_svc, "Identity Service", "Java / Spring Boot", "Аутентификация, RBAC, связь Пользователь-Дом")
+    ContainerDb(auth_db, "Security DB", "PostgreSQL", "Данные доступа и учетные записи")
+
+    ' Управление трафиком
+    Container(api_gw, "API Gateway", "Nginx / Traefik", "Проверка JWT, маршрутизация")
+
+    ' Legacy контур на Go (как в исходниках)
+    System_Boundary(legacy_boundary, "Legacy Contour") {
+        Container(monolith, "Legacy Monolith", "Go (Gin)", "CRUD метаданных датчиков и локаций")
+        ContainerDb(legacy_db, "Legacy DB", "PostgreSQL", "Текущее состояние устройств")
+    }
+
+    ' Телеметрия на Python (идеален для обработки данных)
+    Container(telemetry_svc, "Telemetry Service", "Python (FastAPI/Faust)", "Прием MQTT, запись истории, PATCH в монолит")
+    ContainerDb(history_db, "History DB", "TimescaleDB", "Архив всех показаний (Time-series)")
+    
+    ' WebSocket на Node.js (высокая производительность для сокетов)
+    Container(ws_svc, "WebSocket Service", "Node.js (Socket.io)", "Защищенная Real-time трансляция")
+    
+    ' Брокер
+    Container(mqtt_broker, "MQTT Broker", "Mosquitto", "Прием сообщений от IoT устройств")
+}
+
+System_Ext(sensors, "IoT Devices", "Датчики и Реле (MQTT)")
+
+' Связи безопасности
+Rel(user, auth_svc, "1. Логин / Получение JWT", "HTTPS/JSON")
+Rel(auth_svc, auth_db, "Запрос прав", "SQL")
+Rel(user, api_gw, "2. Настройка (с JWT)", "HTTPS/JSON")
+Rel(api_gw, auth_svc, "Валидация токена", "gRPC / REST")
+Rel(api_gw, monolith, "Проксирование CRUD", "HTTP")
+
+' Поток данных (Телеметрия)
+Rel(sensors, mqtt_broker, "Публикация данных", "MQTT")
+Rel(mqtt_broker, telemetry_svc, "Подписка на топики", "TCP/MQTT")
+Rel(telemetry_svc, history_db, "Запись в историю", "SQL")
+
+' Интеграция с Legacy и UI
+Rel_L(telemetry_svc, monolith, "Синхронизация состояния", "HTTP PATCH /sensors/{id}/value")
+Rel(telemetry_svc, ws_svc, "Событие для UI", "Internal Pub/Sub")
+
+' WebSocket поток
+Rel(user, ws_svc, "3. Подписка на обновления (JWT)", "WSS")
+Rel(ws_svc, auth_svc, "Авторизация доступа", "gRPC / Internal")
+
+Rel(monolith, legacy_db, "Запись в sensors.value", "SQL")
+
+@enduml

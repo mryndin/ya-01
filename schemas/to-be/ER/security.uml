@@ -1,0 +1,48 @@
+@startuml
+!theme plain
+hide circle
+
+title ER Diagram: Security DB (PostgreSQL)
+
+entity "users" {
+    * id : UUID <<PK>>
+    --
+    * login : VARCHAR(50) <<UNIQUE>>
+    * password_hash : VARCHAR(255)
+    * email : VARCHAR(100)
+    * role : VARCHAR(20)
+    created_at : TIMESTAMP
+}
+
+entity "houses" {
+    * id : UUID <<PK>>
+    --
+    * name : VARCHAR(100)
+    * city : VARCHAR(100)
+    address : TEXT
+}
+
+entity "user_houses" {
+    * user_id : UUID <<PK, FK>>
+    * house_id : UUID <<PK, FK>>
+    --
+    access_level : VARCHAR(20)
+}
+
+entity "device_ownership" {
+    * device_id : INT <<PK>> -- Ссылка на ID из Legacy DB
+    --
+    * house_id : UUID <<FK>>
+    * auth_key : VARCHAR(255) <<UNIQUE>> -- Для MQTT Auth
+}
+
+users ||--o{ user_houses
+houses ||--o{ user_houses
+houses ||--o{ device_ownership
+
+note bottom of device_ownership
+  Индекс: idx_device_house (house_id)
+  Индекс: idx_auth_key (auth_key)
+end note
+
+@enduml

@@ -1,0 +1,161 @@
+openapi: 3.0.3
+info:
+  title: "Smart Home Legacy Monolith (Internal)"
+  description: "Внутренний API монолита для управления датчиками. Используется только Telemetry и Identity сервисами."
+  version: "1.0.0"
+
+servers:
+  - url: "http://localhost:8080"
+    description: "Локальный адрес монолита"
+
+components:
+  schemas:
+    Sensor:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 1
+        name:
+          type: string
+          example: "Living Room Temperature"
+        type:
+          type: string
+          example: "temperature"
+        location:
+          type: string
+          example: "Living Room"
+        unit:
+          type: string
+          example: "°C"
+        value:
+          type: number
+          example: 22.5
+        status:
+          type: string
+          example: "active"
+
+paths:
+  /health:
+    get:
+      summary: "Health Check"
+      description: "Check if the API is running"
+      tags:
+        - System
+      responses:
+        '200':
+          description: "API is running"
+
+  /api/v1/sensors:
+    get:
+      summary: "Get All Sensors"
+      tags:
+        - Sensors
+      responses:
+        '200':
+          description: "Retrieve all sensors"
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Sensor'
+    post:
+      summary: "Create Sensor"
+      tags:
+        - Sensors
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - name
+                - type
+              properties:
+                name:
+                  type: string
+                type:
+                  type: string
+                location:
+                  type: string
+                unit:
+                  type: string
+      responses:
+        '201':
+          description: "Sensor created"
+
+  /api/v1/sensors/{id}:
+    get:
+      summary: "Get Sensor by ID"
+      tags:
+        - Sensors
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: "Specific sensor data"
+    put:
+      summary: "Update Sensor"
+      tags:
+        - Sensors
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Sensor'
+      responses:
+        '200':
+          description: "Sensor updated"
+    delete:
+      summary: "Delete Sensor"
+      tags:
+        - Sensors
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '204':
+          description: "Sensor deleted"
+
+  /api/v1/sensors/{id}/value:
+    patch:
+      summary: "Update Sensor Value"
+      description: "Обновление показаний (вызывается Telemetry Service)"
+      tags:
+        - Sensors
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                value:
+                  type: number
+                status:
+                  type: string
+      responses:
+        '200':
+          description: "Value updated"

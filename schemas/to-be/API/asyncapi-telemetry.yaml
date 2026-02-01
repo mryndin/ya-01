@@ -1,0 +1,63 @@
+﻿asyncapi: 2.6.0
+info:
+  title: "SmartHome Telemetry & Real-time API"
+  version: "1.1.0"
+  description: "Событийная модель для IoT устройств и push-уведомлений клиентам."
+
+servers:
+  mqtt-broker:
+    url: "mqtt://broker.smarthome.internal:1883"
+    protocol: mqtt
+    description: "Брокер для IoT устройств. Требует auth_key для подключения."
+  ws-server:
+    url: "wss://api.smarthome.io/ws"
+    protocol: wss
+    description: "WebSocket сервер для клиентских приложений."
+
+channels:
+  "device/telemetry":
+    publish:
+      summary: "Публикация данных с устройства"
+      message:
+        payload:
+          type: object
+          required:
+            - device_id
+            - value
+            - auth_key
+          properties:
+            device_id:
+              type: integer
+              description: "ID устройства из Legacy DB (sensors.id)"
+            value:
+              type: number
+              description: "Текущее значение датчика"
+            auth_key:
+              type: string
+              description: "Ключ авторизации модуля из таблицы device_ownership"
+            timestamp:
+              type: integer
+              description: "Unix время замера"
+
+  "/houses/{houseId}/stream":
+    parameters:
+      houseId:
+        schema:
+          type: string
+          format: uuid
+    subscribe:
+      summary: "Подписка на живой поток данных конкретного дома"
+      description: "Доступ ограничивается на основе таблицы user_houses."
+      message:
+        payload:
+          type: object
+          properties:
+            device_id:
+              type: integer
+            value:
+              type: number
+            status:
+              type: string
+            ts:
+              type: string
+              format: date-time

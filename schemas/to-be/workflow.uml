@@ -1,0 +1,51 @@
+@startuml
+autonumber
+actor Admin
+actor User
+participant "Identity Service" as Identity
+database "Postgres (Security DB)" as DB
+participant "Legacy Monolith" as Monolith
+participant "MQTT Broker" as MQTT
+participant "Telemetry Service" as Telemetry
+participant "WebSocket Service" as WS
+
+== 1. Вход и настройка системы (Admin) ==
+Admin -> Identity : POST /auth/login (admin credentials)
+Identity -> DB : Verify credentials
+Identity --> Admin : Auth Token (Admin Role)
+
+Admin -> Identity : POST /api/v1/houses (Register House)
+Identity -> DB : INSERT INTO houses
+Identity --> Admin : House Created (UUID)
+
+Admin -> Identity : POST /api/v1/users (Register User)
+Identity -> DB : INSERT INTO users
+Identity --> Admin : User Created (UUID)
+
+Admin -> Identity : POST /api/v1/houses/{id}/assign-user
+note right: Связывает пользователя с объектом
+Identity -> DB : INSERT INTO user_houses
+Identity --> Admin : Access Linked
+
+== 2. Работа Пользователя ==
+User -> Identity : POST /auth/login
+Identity --> User : Auth Token (User Role)
+
+User -> Identity : POST /api/v1/houses/{id}/devices
+note right: Указывает, какой датчик (ID из монолита)\nустановлен в этом доме
+Identity -> DB : INSERT INTO device_ownership
+Identity --> User : Device Module Linked
+
+== 3. Поток телеметрии ==
+entity "IoT Sensor" as Sensor
+Sensor -> MQTT : pub: device/telemetry {id, value, auth_key}
+MQTT -> Telemetry : Dispatch
+Telemetry -> Identity : Validate(id, key)
+Identity --> Telemetry : Valid (Target: House A)
+
+Telemetry -> Monolith : PATCH /api/v1/sensors/{id}
+Monolith -> DB : Update sensors table
+Telemetry -> MQTT : internal/notify
+MQTT -> WS : Forward
+WS -> User : WebSocket: Real-time Update
+@enduml
