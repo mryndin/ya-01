@@ -96,5 +96,25 @@
     ```
     *Сценарий имитирует регистрацию пользователя, привязку дома и успешную передачу данных с датчика.*
 
+### Технологический стек MVP:
+
+Java 17 (Identity)
+
+Python 3.10 (Telemetry)
+
+PHP 8.2 (Temperature API)
+
+Node.js (Websocket Service)
+
+Go (Legacy)
+
+MQTT (Mosquitto)
+
+PostgreSQL 15
+
+Docker
+
+**Статус:** MVP успешно реализован. Все сервисы интегрированы в общую сеть smarthome-network.
+
 ---
 **Статус проекта:** MVP готов к эксплуатации.

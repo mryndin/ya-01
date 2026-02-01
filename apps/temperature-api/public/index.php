@@ -1,76 +1,91 @@
 <?php
 /**
  * Точка входа в приложение Temperature API
- * 
- * @package App
  */
 
-// Запуск приложения
+// Запрещаем вывод ошибок в поток, чтобы не ломать структуру JSON
+ini_set('display_errors', 0);
+error_reporting(E_ALL);
+
 try {
-    // Инициализация приложения
     $config = require __DIR__ . '/../src/bootstrap.php';
-    
-    // Создание сервисов
+
     $temperatureService = new App\Services\TemperatureGeneratorService($config);
-    
-    // Создание контроллеров
     $temperatureController = new App\Controllers\TemperatureController($temperatureService);
     $healthController = new App\Controllers\HealthController($config);
-    
-    // Инициализация маршрутизатора
+
     $router = new App\Core\Router();
-    
-    // Регистрация маршрутов
+
+    // РЕГИСТРАЦИЯ МАРШРУТОВ
+    $router->add('GET', '/api/v1/sensors/temperature/:location', [$temperatureController, 'getTemperature']);
+    $router->add('GET', '/api/v1/sensors/temperature', [$temperatureController, 'getTemperature']);
     $router->add('GET', '/temperature', [$temperatureController, 'getTemperature']);
     $router->add('OPTIONS', '/temperature', [$temperatureController, 'options']);
-    
+
     $router->add('GET', '/health', [$healthController, 'health']);
     $router->add('OPTIONS', '/health', [$healthController, 'options']);
-    
+
     $router->add('GET', '/ready', [$healthController, 'ready']);
     $router->add('OPTIONS', '/ready', [$healthController, 'options']);
-    
+
     // Получение данных запроса
     $requestMethod = $_SERVER['REQUEST_METHOD'] ?? 'GET';
-    $requestPath = parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH);
+    $rawUri = $_SERVER['REQUEST_URI'] ?? '/';
+
+    // Чистим путь от query-строки для роутера
+    $requestPath = rtrim(parse_url($rawUri, PHP_URL_PATH), '/');
+    if (empty($requestPath)) $requestPath = '/';
+
+    // Собираем параметры из $_GET
     $queryParams = $_GET;
-    
-    // Обработка запроса
+
+    /**
+     * ЛОГИКА ОБРАБОТКИ ПРОБЕЛОВ
+     * Если Go прислал "...?location=Living Room" (с пробелом),
+     * PHP может не положить это в $_GET корректно.
+     */
+    if (strpos($rawUri, 'location=') !== false) {
+        // Вырезаем всё, что идет после 'location='
+        $parts = explode('location=', $rawUri);
+        if (isset($parts[1])) {
+            // Декодируем на случай, если там смесь пробелов и %20
+            $queryParams['location'] = urldecode($parts[1]);
+        }
+    }
+
+    // Если локация была в пути (например, /temperature/Living Room)
+    if (preg_match('#sensors/temperature/([^/?]+)#', $rawUri, $matches)) {
+        $queryParams['location'] = urldecode($matches[1]);
+    }
+
+    // ДИСПЕТЧЕРИЗАЦИЯ
     $response = $router->dispatch($requestMethod, $requestPath, $queryParams);
-    
-    // Если маршрут не найден - 404
+
+    // ФОЛБЭК: Если роутер не нашел маршрут из-за пробелов в пути, вызываем контроллер напрямую
+    if ($response === null && (str_contains($requestPath, 'temperature') || isset($queryParams['location']))) {
+        $response = $temperatureController->getTemperature($queryParams);
+    }
+
+    // Если всё равно пусто — 404
     if ($response === null) {
         $response = App\Core\Response::json([
             'error' => true,
             'message' => 'Endpoint not found',
-            'path' => $requestPath,
-            'timestamp' => date('c')
+            'debug_uri' => $rawUri
         ], 404);
     }
-    
-    // Отправка ответа
+
+    // ОТПРАВКА ОТВЕТА
     $response->send();
-    
+
 } catch (Throwable $e) {
-    // Обработка непойманных исключений
-    http_response_code(500);
-    header('Content-Type: application/json');
-    
-    $errorData = [
-        'error' => true,
-        'message' => 'Internal server error',
-        'timestamp' => date('c')
-    ];
-    
-    // В режиме отладки добавляем детали ошибки
-    if (($config['app']['debug'] ?? false) === true) {
-        $errorData['debug'] = [
-            'message' => $e->getMessage(),
-            'file' => $e->getFile(),
-            'line' => $e->getLine(),
-            'trace' => $e->getTrace()
-        ];
+    // В случае фатальной ошибки возвращаем JSON, чтобы Go не получил пустой EOF
+    if (!headers_sent()) {
+        header('Content-Type: application/json');
+        http_response_code(500);
     }
-    
-    echo json_encode($errorData, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
+    echo json_encode([
+        'error' => true,
+        'message' => $e->getMessage()
+    ]);
 }
