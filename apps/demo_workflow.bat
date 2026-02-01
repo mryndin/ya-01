@@ -11,7 +11,7 @@ if exist user.json del user.json
 
 :: --- ШАГ 0: ГАРАНТИЯ ДАТЧИКА В МОНОЛИТЕ ---
 echo [0/6] Ensuring Legacy Sensor exists...
-docker exec -i smarthome-postgres psql -U postgres -d smarthome -c "INSERT INTO sensors (id, name, type, location, unit, status) VALUES (1, 'Sensor-001', 'temp', 'Kitchen', 'C', 'active') ON CONFLICT (id) DO NOTHING;" >nul 2>&1
+docker exec -i smarthome-postgres psql -U postgres -d smarthome -c "INSERT INTO sensors (id, name, type, location, unit, status) VALUES (1, 'Sensor-001', 'temperature', 'Kitchen', 'C', 'active') ON CONFLICT (id) DO NOTHING;" >nul 2>&1
 
 :: --- ШАГ 1: ВХОД АДМИНА ---
 echo.
